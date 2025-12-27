@@ -1,0 +1,71 @@
+menu "DEVICE CONFIG"
+    config LCD_WIDTH
+        int "LCD WIDTH"
+        default 320
+    config LCD_HEIGHT
+        int "LCD HEIGHT"
+        default 240
+    config LCD_SCLK_GPIO
+        int "LCD SCLK GPIO"
+        default 12
+    config LCD_DC_GPIO
+        int "LCD DC GPIO"
+        default 46
+    config LCD_CS_GPIO
+        int "LCD CS GPIO"
+        default 10
+    config LCD_MISO_GPIO
+        int "LCD MISO GPIO"
+        default 13
+    config LCD_MOSI_GPIO
+        int "LCD MOSI GPIO"
+        default 11
+    config LCD_BL_GPIO
+        int "LCD BL GPIO"
+        default 45
+    config LCD_RST_GPIO
+        int "LCD RST GPIO"
+        default -1
+    config LCD_OFFSET_X
+        int "LCD X OFFSET"
+        default 0
+    config LCD_OFFSET_Y
+        int "LCD Y OFFSET"
+        default 0
+    config LCD_PIXEL_CLOCK
+        int "LCD PIXEL CLOCK (Hz)"
+        default 40000000
+    config LCD_BL_ACTIVE_HIGH
+        bool "LCD backlight active high"
+        default y
+    config LCD_SWAP_XY
+        bool "LCD swap X/Y (rotation)"
+        default y
+    config LCD_MIRROR_X
+        bool "LCD mirror X"
+        default n
+    config LCD_MIRROR_Y
+        bool "LCD mirror Y"
+        default n
+    config LCD_INVERT_COLORS
+        bool "LCD invert colors"
+        default n
+    config LCD_COLOR_SPACE_BGR
+        bool "LCD color space BGR"
+        default y
+endmenu
+
+menu "SD CARD (SDSPI) CONFIG"
+    config SD_SPI_MOSI_GPIO
+        int "SD SPI MOSI GPIO"
+        default 23
+    config SD_SPI_MISO_GPIO
+        int "SD SPI MISO GPIO"
+        default 19
+    config SD_SPI_CLK_GPIO
+        int "SD SPI CLK GPIO"
+        default 18
+    config SD_SPI_CS_GPIO
+        int "SD SPI CS GPIO"
+        default 5
+endmenu

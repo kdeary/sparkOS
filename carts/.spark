@@ -1,0 +1,2 @@
+# This is the boot file. It is used to store settings that the emulator should follow upon booting. On boot, if ROM_FILE is nonexistant, empty, or does not exist in the fs, the system will boot the home application.
+ROM_FILE=example.gbc
