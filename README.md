@@ -42,7 +42,7 @@ Filesystem/partition
 
 Project layout
 --------------
-- `main/spark_pico.c` – app entry, SD card mount, boot config parsing, sparkEngine runtime, ST7796 driver, framebuffer render loop.
+- `main/spark.c` – app entry, SD card mount, boot config parsing, sparkEngine runtime, ST7796 driver, framebuffer render loop.
 - `sparkEngine/` – spark! runtime and tooling.
 - `partitions.csv` – partition table for the ESP32 app.
 

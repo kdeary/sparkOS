@@ -30,8 +30,16 @@ set(WASM3_SRCS
     "../sparkEngine/wasm3/source/m3_parse.c"
 )
 
+# Wasm3 triggers -Werror=maybe-uninitialized under GCC 14; keep it as a warning.
+if (NOT CMAKE_SCRIPT_MODE_FILE)
+    set_source_files_properties(
+        "../sparkEngine/wasm3/source/m3_parse.c"
+        PROPERTIES COMPILE_FLAGS "-Wno-error=maybe-uninitialized"
+    )
+endif()
+
 idf_component_register(
-    SRCS "spark_pico.c" ${SPARK_ENGINE_SRCS} ${WASM3_SRCS}
+    SRCS "spark.c" ${SPARK_ENGINE_SRCS} ${WASM3_SRCS}
     INCLUDE_DIRS
         "."
         "../sparkEngine/src"
