@@ -24,12 +24,11 @@ Display
   - Size: 320x240, offsets 0,0, pixel clock 40 MHz
   - Uses HSPI by default (SPI2_HOST) to leave VSPI free for SD.
 
-microSD (SPI mode)
-------------------
-- The microSD card is mounted at `/carts` using SDSPI + FATFS.
-- Defaults live in `main/Kconfig.projbuild` (`CONFIG_SD_SPI_*`):
-  - SCLK=18, MOSI=23, MISO=19, CS=5 (VSPI pins from the provided ESP32 pinout)
-  - Uses VSPI by default (SPI3_HOST) to avoid sharing the LCD bus.
+microSD (SDIO/SDMMC mode)
+-------------------------
+- The microSD card is mounted at `/carts` using the SDMMC (4-bit) interface + FATFS.
+- Defaults live in `main/Kconfig.projbuild` (`CONFIG_SDMMC_*`):
+  - CLK=38, CMD=40, D0=39, D1=41, D2=48, D3=47
 
 Filesystem/partition
 --------------------

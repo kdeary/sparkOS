@@ -48,5 +48,5 @@ idf_component_register(
         "../sparkEngine/src/parser"
         "../sparkEngine/src/modules"
         "../sparkEngine/wasm3/source"
-    REQUIRES esp_lcd driver fatfs sdmmc esp_driver_sdspi esp_lcd_ili9341
+    REQUIRES esp_lcd driver fatfs sdmmc esp_driver_sdmmc esp_lcd_ili9341
 )

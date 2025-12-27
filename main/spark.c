@@ -10,7 +10,7 @@
 #include "esp_log.h"
 
 #include "driver/gpio.h"
-#include "driver/sdspi_host.h"
+#include "driver/sdmmc_host.h"
 #include "driver/spi_master.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_ops.h"
@@ -84,20 +84,23 @@
 #ifndef CONFIG_LCD_COLOR_SPACE_BGR
 #define CONFIG_LCD_COLOR_SPACE_BGR 1
 #endif
-#ifndef CONFIG_SD_SPI_MOSI_GPIO
-#define CONFIG_SD_SPI_MOSI_GPIO 23
+#ifndef CONFIG_SDMMC_CLK_GPIO
+#define CONFIG_SDMMC_CLK_GPIO 38
 #endif
-#ifndef CONFIG_SD_SPI_MISO_GPIO
-#define CONFIG_SD_SPI_MISO_GPIO 19
+#ifndef CONFIG_SDMMC_CMD_GPIO
+#define CONFIG_SDMMC_CMD_GPIO 40
 #endif
-#ifndef CONFIG_SD_SPI_CLK_GPIO
-#define CONFIG_SD_SPI_CLK_GPIO 18
+#ifndef CONFIG_SDMMC_D0_GPIO
+#define CONFIG_SDMMC_D0_GPIO 39
 #endif
-#ifndef CONFIG_SD_SPI_CS_GPIO
-#define CONFIG_SD_SPI_CS_GPIO 5
+#ifndef CONFIG_SDMMC_D1_GPIO
+#define CONFIG_SDMMC_D1_GPIO 41
 #endif
-#ifndef CONFIG_SD_SPI_HOST
-#define CONFIG_SD_SPI_HOST SPI3_HOST
+#ifndef CONFIG_SDMMC_D2_GPIO
+#define CONFIG_SDMMC_D2_GPIO 48
+#endif
+#ifndef CONFIG_SDMMC_D3_GPIO
+#define CONFIG_SDMMC_D3_GPIO 47
 #endif
 #define LCD_HOST SPI2_HOST
 
@@ -347,36 +350,25 @@ static void display_draw_bitmap(int xs, int ys, int xe, int ye, const uint16_t *
 
 static esp_err_t mount_filesystem(void)
 {
-    spi_bus_config_t bus_cfg = {
-        .mosi_io_num = CONFIG_SD_SPI_MOSI_GPIO,
-        .miso_io_num = CONFIG_SD_SPI_MISO_GPIO,
-        .sclk_io_num = CONFIG_SD_SPI_CLK_GPIO,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1,
-        .max_transfer_sz = 4000,
-    };
-
-    esp_err_t ret = spi_bus_initialize(CONFIG_SD_SPI_HOST, &bus_cfg, SPI_DMA_CH_AUTO);
-    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
-        ESP_LOGE(TAG, "SPI bus init failed for SD (%s)", esp_err_to_name(ret));
-        return ret;
-    }
-
-    sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
-    slot_config.gpio_cs = CONFIG_SD_SPI_CS_GPIO;
-    slot_config.host_id = CONFIG_SD_SPI_HOST;
-
-    sdmmc_host_t host = SDSPI_HOST_DEFAULT();
-    host.slot = CONFIG_SD_SPI_HOST;
-
+    sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+    sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
     esp_vfs_fat_sdmmc_mount_config_t mount_config = {
         .format_if_mount_failed = false,
         .max_files = 5,
         .allocation_unit_size = 16 * 1024,
     };
 
+    slot_config.width = 4;
+    slot_config.clk = CONFIG_SDMMC_CLK_GPIO;
+    slot_config.cmd = CONFIG_SDMMC_CMD_GPIO;
+    slot_config.d0 = CONFIG_SDMMC_D0_GPIO;
+    slot_config.d1 = CONFIG_SDMMC_D1_GPIO;
+    slot_config.d2 = CONFIG_SDMMC_D2_GPIO;
+    slot_config.d3 = CONFIG_SDMMC_D3_GPIO;
+    slot_config.flags = SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
+
     ESP_LOGI(TAG, "Mounting SD card at %s", FILESYSTEM_BASE_PATH);
-    ret = esp_vfs_fat_sdspi_mount(FILESYSTEM_BASE_PATH, &host, &slot_config, &mount_config, &s_sd_card);
+    esp_err_t ret = esp_vfs_fat_sdmmc_mount(FILESYSTEM_BASE_PATH, &host, &slot_config, &mount_config, &s_sd_card);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to mount SD card (%s)", esp_err_to_name(ret));
         return ret;
@@ -388,13 +380,15 @@ static esp_err_t mount_filesystem(void)
 
 void app_main(void)
 {
-    SparkRuntime runtime;
-    SparkStaticReader reader;
+    static SparkRuntime runtime;
+    static SparkStaticReader reader;
+    static uint16_t line_buffer[SCREEN_WIDTH];
     const char *error = NULL;
     char cart_path[256] = {0};
     uint8_t *cart_blob = NULL;
     size_t cart_blob_size = 0;
-    uint16_t line_buffer[SCREEN_WIDTH];
+
+    ESP_LOGI(TAG, "spark! loading...");
 
     if (!init_display()) {
         ESP_LOGE(TAG, "LCD init failed");
