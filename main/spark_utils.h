@@ -3,12 +3,14 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 typedef struct SparkStaticReader {
     const uint8_t *data;
     uint32_t size;
     uint32_t static_offset;
     uint32_t static_size;
+    FILE *file;
 } SparkStaticReader;
 
 int spark_read_static_memory(uint32_t index, uint32_t size, uint8_t *out, void *userdata);

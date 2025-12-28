@@ -66,7 +66,7 @@ bool spark_device_init_display(void)
 
     esp_lcd_panel_dev_config_t panel_config = {
         .reset_gpio_num = CONFIG_LCD_RST_GPIO,
-        .color_space = CONFIG_LCD_COLOR_SPACE_BGR ? ESP_LCD_COLOR_SPACE_BGR : ESP_LCD_COLOR_SPACE_RGB,
+        .color_space = ESP_LCD_COLOR_SPACE_BGR,
         .bits_per_pixel = 16,
         .vendor_config = NULL,
     };

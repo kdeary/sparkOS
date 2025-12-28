@@ -86,8 +86,8 @@ static void draw_text_line(int x, int y, const char *text, uint16_t fg, uint16_t
     }
 
     int cursor_x = x;
-    uint16_t fg_out = spark_color_swap_bytes(CONFIG_LCD_COLOR_SPACE_BGR ? spark_color_rgb_to_bgr(fg) : fg);
-    uint16_t bg_out = spark_color_swap_bytes(CONFIG_LCD_COLOR_SPACE_BGR ? spark_color_rgb_to_bgr(bg) : bg);
+    uint16_t fg_out = spark_color_swap_bytes(fg);
+    uint16_t bg_out = spark_color_swap_bytes(bg);
 
     while (*text) {
         char ch = *text++;
@@ -129,7 +129,7 @@ void spark_gui_draw_error_screen(const char *line1, const char *line2)
     uint16_t *line = s_scanline;
     uint16_t bg = 0x0000;
     uint16_t fg = 0xFFFF;
-    uint16_t bg_out = spark_color_swap_bytes(CONFIG_LCD_COLOR_SPACE_BGR ? spark_color_rgb_to_bgr(bg) : bg);
+    uint16_t bg_out = spark_color_swap_bytes(bg);
     for (int x = 0; x < SCREEN_WIDTH; ++x) {
         line[x] = bg_out;
     }
@@ -137,12 +137,12 @@ void spark_gui_draw_error_screen(const char *line1, const char *line2)
         spark_device_draw_bitmap(0, y, SCREEN_WIDTH, y + 1, line);
     }
 
-    draw_text_line(8, 40, "SPARK ERROR", fg, bg, 2);
+    draw_text_line(10, 10, "SPARK ERROR", fg, bg, 2);
     if (line1) {
-        draw_text_line(8, 80, line1, fg, bg, 1);
+        draw_text_line(10, 30, line1, fg, bg, 1);
     }
     if (line2) {
-        draw_text_line(8, 100, line2, fg, bg, 1);
+        draw_text_line(10, 45, line2, fg, bg, 1);
     }
 }
 
@@ -157,9 +157,9 @@ void spark_gui_draw_progress_screen(const char *filename, uint32_t percent)
     uint16_t fg = 0xFFFF;
     uint16_t border = 0xFFFF;
     uint16_t fill = 0x07E0;
-    uint16_t bg_out = spark_color_swap_bytes(CONFIG_LCD_COLOR_SPACE_BGR ? spark_color_rgb_to_bgr(bg) : bg);
-    uint16_t border_out = spark_color_swap_bytes(CONFIG_LCD_COLOR_SPACE_BGR ? spark_color_rgb_to_bgr(border) : border);
-    uint16_t fill_out = spark_color_swap_bytes(CONFIG_LCD_COLOR_SPACE_BGR ? spark_color_rgb_to_bgr(fill) : fill);
+    uint16_t bg_out = spark_color_swap_bytes(bg);
+    uint16_t border_out = spark_color_swap_bytes(border);
+    uint16_t fill_out = spark_color_swap_bytes(fill);
 
     for (int x = 0; x < SCREEN_WIDTH; ++x) {
         line[x] = bg_out;

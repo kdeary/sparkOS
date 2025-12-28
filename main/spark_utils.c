@@ -6,6 +6,33 @@
 #include "esp_heap_caps.h"
 #include "esp_rom_sys.h"
 
+static int spark_read_static_memory_from_file(SparkStaticReader *reader,
+                                              uint32_t index,
+                                              uint32_t size,
+                                              uint8_t *out)
+{
+    long offset = 0;
+
+    if (!reader || !reader->file || !out) {
+        return 0;
+    }
+
+    if (index > reader->static_size || size > reader->static_size - index) {
+        return 0;
+    }
+
+    offset = (long)(reader->static_offset + index);
+    if (fseek(reader->file, offset, SEEK_SET) != 0) {
+        return 0;
+    }
+
+    if (fread(out, 1, size, reader->file) != size) {
+        return 0;
+    }
+
+    return 1;
+}
+
 int spark_read_static_memory(uint32_t index, uint32_t size, uint8_t *out, void *userdata)
 {
     SparkStaticReader *reader = (SparkStaticReader *)userdata;
@@ -15,13 +42,17 @@ int spark_read_static_memory(uint32_t index, uint32_t size, uint8_t *out, void *
         return 0;
     }
 
-    if (index > reader->static_size || size > reader->static_size - index) {
-        return 0;
+    if (reader->data) {
+        if (index > reader->static_size || size > reader->static_size - index) {
+            return 0;
+        }
+
+        src = reader->data + reader->static_offset + index;
+        memcpy(out, src, size);
+        return 1;
     }
 
-    src = reader->data + reader->static_offset + index;
-    memcpy(out, src, size);
-    return 1;
+    return spark_read_static_memory_from_file(reader, index, size, out);
 }
 
 char *spark_trim(char *str)

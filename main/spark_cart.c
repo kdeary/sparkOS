@@ -1,18 +1,13 @@
 #include "spark_cart.h"
 
 #include <errno.h>
-#include <inttypes.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
-#include "esp_err.h"
 #include "esp_log.h"
-#include "esp_rom_crc.h"
+#include "esp_heap_caps.h"
 
-#include "parser/sprk_parser.h"
-
-#include "spark_device.h"
 #include "spark_gui.h"
 #include "spark_utils.h"
 
@@ -80,48 +75,66 @@ bool spark_cart_load_boot_path(char *out, size_t out_size, char *err, size_t err
     return false;
 }
 
-const uint8_t *spark_cart_load_to_partition(const char *path,
-                                            size_t *out_size,
-                                            esp_partition_mmap_handle_t *out_handle,
-                                            char *err,
-                                            size_t err_size)
+static bool spark_cart_read_header(FILE *file,
+                                   uint8_t *header,
+                                   size_t header_size,
+                                   uint32_t *wasm_size,
+                                   uint32_t *stack_size,
+                                   char *err,
+                                   size_t err_size)
 {
-    const esp_partition_t *part = NULL;
+    static const uint8_t magic[] = { 'S','P','A','R','K','Y',0x04,0x06 };
+
+    if (fread(header, 1, header_size, file) != header_size) {
+        if (err && err_size) {
+            snprintf(err, err_size, "header read failed");
+        }
+        return false;
+    }
+
+    if (memcmp(header, magic, sizeof(magic)) != 0) {
+        if (err && err_size) {
+            snprintf(err, err_size, "invalid .sprk magic");
+        }
+        return false;
+    }
+
+    memcpy(wasm_size, header + sizeof(magic), sizeof(uint32_t));
+    memcpy(stack_size, header + sizeof(magic) + sizeof(uint32_t), sizeof(uint32_t));
+    return true;
+}
+
+bool spark_cart_load_wasm_psram(const char *path,
+                                SparkCartImage *out,
+                                char *err,
+                                size_t err_size)
+{
+    static const size_t header_size = 16;
     FILE *file = NULL;
-    size_t size = 0;
+    uint8_t header[16];
     long length = 0;
-    uint8_t *buffer = s_cart_io_buf;
+    size_t file_size = 0;
+    uint32_t wasm_size = 0;
+    uint32_t stack_size = 0;
+    uint8_t *image = NULL;
+    size_t image_size = 0;
     size_t offset = 0;
-    esp_partition_mmap_handle_t mmap_handle = 0;
-    const void *mmap_ptr = NULL;
-    bool erased = false;
-    uint32_t crc_sd = 0;
-    uint32_t crc_flash = 0;
 
-    if (!path) {
+    if (!path || !out) {
         if (err && err_size) {
-            snprintf(err, err_size, "bad path");
+            snprintf(err, err_size, "bad args");
         }
-        return NULL;
+        return false;
     }
 
-    part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "rom");
-    if (!part) {
-        if (err && err_size) {
-            snprintf(err, err_size, "rom partition missing");
-        }
-        return NULL;
-    }
-
-    ESP_LOGI(TAG, "Using ROM partition at 0x%08" PRIx32 " size=%" PRIu32,
-             part->address, part->size);
+    memset(out, 0, sizeof(*out));
 
     file = fopen(path, "rb");
     if (!file) {
         if (err && err_size) {
             snprintf(err, err_size, "open: %s", strerror(errno));
         }
-        return NULL;
+        return false;
     }
 
     if (fseek(file, 0, SEEK_END) != 0) {
@@ -129,7 +142,7 @@ const uint8_t *spark_cart_load_to_partition(const char *path,
             snprintf(err, err_size, "seek end: %s", strerror(errno));
         }
         fclose(file);
-        return NULL;
+        return false;
     }
 
     length = ftell(file);
@@ -138,164 +151,113 @@ const uint8_t *spark_cart_load_to_partition(const char *path,
             snprintf(err, err_size, "size invalid");
         }
         fclose(file);
-        return NULL;
+        return false;
     }
-    size = (size_t)length;
-
-    if ((size + 1) > part->size) {
-        if (err && err_size) {
-            snprintf(err, err_size, "cart too big (%u)", (unsigned)size);
-        }
-        fclose(file);
-        return NULL;
-    }
+    file_size = (size_t)length;
 
     if (fseek(file, 0, SEEK_SET) != 0) {
         if (err && err_size) {
             snprintf(err, err_size, "seek start: %s", strerror(errno));
         }
         fclose(file);
-        return NULL;
+        return false;
     }
+
+    if (!spark_cart_read_header(file, header, header_size, &wasm_size, &stack_size, err, err_size)) {
+        fclose(file);
+        return false;
+    }
+
+    if (header_size + wasm_size > file_size) {
+        if (err && err_size) {
+            snprintf(err, err_size, "invalid .sprk wasm size");
+        }
+        fclose(file);
+        return false;
+    }
+
+    if (wasm_size < 4) {
+        if (err && err_size) {
+            snprintf(err, err_size, "missing wasm");
+        }
+        fclose(file);
+        return false;
+    }
+
+    image_size = header_size + wasm_size;
+    image = (uint8_t *)heap_caps_malloc(image_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!image) {
+        if (err && err_size) {
+            snprintf(err, err_size, "psram alloc failed");
+        }
+        fclose(file);
+        return false;
+    }
+
+    memcpy(image, header, header_size);
 
     const char *filename = spark_path_basename(path);
     spark_gui_draw_progress_screen(filename, 0);
 
-    while (offset < size) {
-        size_t to_read = size - offset;
+    offset = 0;
+    while (offset < wasm_size) {
+        size_t to_read = wasm_size - offset;
         if (to_read > sizeof(s_cart_io_buf)) {
             to_read = sizeof(s_cart_io_buf);
         }
-        size_t got = fread(buffer, 1, to_read, file);
-        if (got != to_read) {
+        if (fread(s_cart_io_buf, 1, to_read, file) != to_read) {
             if (err && err_size) {
-                snprintf(err, err_size, "read: %s", strerror(errno));
+                snprintf(err, err_size, "wasm read failed");
             }
+            heap_caps_free(image);
             fclose(file);
-            return NULL;
+            return false;
         }
 
-        crc_sd = esp_rom_crc32_le(crc_sd, buffer, (uint32_t)got);
+        memcpy(image + header_size + offset, s_cart_io_buf, to_read);
+        offset += to_read;
 
-        uint32_t percent = (uint32_t)(((offset + got) * 100ULL) / size);
+        uint32_t percent = (uint32_t)((offset * 100ULL) / wasm_size);
         spark_gui_draw_progress_screen(filename, percent);
-
-        fclose(file);
-        spark_device_unmount_filesystem();
-
-        if (!erased) {
-            size_t erase_size = (size + 1 + 0xFFF) & ~0xFFF;
-            esp_err_t err_rc = esp_partition_erase_range(part, 0, erase_size);
-            if (err_rc != ESP_OK) {
-                if (err && err_size) {
-                    snprintf(err, err_size, "erase: %s", esp_err_to_name(err_rc));
-                }
-                return NULL;
-            }
-            erased = true;
-        }
-
-        esp_err_t err_rc = esp_partition_write(part, offset, buffer, got);
-        if (err_rc != ESP_OK) {
-            if (err && err_size) {
-                snprintf(err, err_size, "write: %s", esp_err_to_name(err_rc));
-            }
-            return NULL;
-        }
-
-        if (spark_device_mount_filesystem() != ESP_OK) {
-            if (err && err_size) {
-                snprintf(err, err_size, "remount failed");
-            }
-            return NULL;
-        }
-        file = fopen(path, "rb");
-        if (!file) {
-            if (err && err_size) {
-                snprintf(err, err_size, "reopen: %s", strerror(errno));
-            }
-            return NULL;
-        }
-        if (fseek(file, (long)(offset + got), SEEK_SET) != 0) {
-            if (err && err_size) {
-                snprintf(err, err_size, "reseek: %s", strerror(errno));
-            }
-            fclose(file);
-            return NULL;
-        }
-        offset += got;
     }
 
-    fclose(file);
-    spark_device_unmount_filesystem();
-
-    uint8_t terminator = 0;
-    esp_err_t err_rc = esp_partition_write(part, size, &terminator, 1);
-    if (err_rc != ESP_OK) {
-        if (err && err_size) {
-            snprintf(err, err_size, "write nul: %s", esp_err_to_name(err_rc));
-        }
-        return NULL;
-    }
-
-    err_rc = esp_partition_mmap(part, 0, size + 1, ESP_PARTITION_MMAP_DATA, &mmap_ptr, &mmap_handle);
-    if (err_rc != ESP_OK) {
-        if (err && err_size) {
-            snprintf(err, err_size, "mmap: %s", esp_err_to_name(err_rc));
-        }
-        return NULL;
-    }
-
-    crc_flash = esp_rom_crc32_le(0, (const uint8_t *)mmap_ptr, (uint32_t)size);
-    if (crc_flash != crc_sd) {
-        if (err && err_size) {
-            snprintf(err, err_size, "flash verify fail");
-        }
-        esp_partition_munmap(mmap_handle);
-        return NULL;
-    }
-
-    if (spark_device_mount_filesystem() != ESP_OK) {
-        if (err && err_size) {
-            snprintf(err, err_size, "remount failed");
-        }
-    }
-
-    if (out_size) {
-        *out_size = size;
-    }
-    if (out_handle) {
-        *out_handle = mmap_handle;
-    }
-    return (const uint8_t *)mmap_ptr;
-}
-
-bool spark_cart_validate_image(const uint8_t *data, size_t size, char *err, size_t err_size)
-{
-    const char *parse_error = NULL;
-    SparkCartridge cart = spark_cartridge_parse(data, (uint32_t)size, &parse_error);
-
-    if (parse_error) {
-        if (err && err_size) {
-            snprintf(err, err_size, "%s", parse_error);
-        }
-        return false;
-    }
-
-    if (cart.wasm_size < 4 || !cart.wasm_data) {
-        if (err && err_size) {
-            snprintf(err, err_size, "missing wasm");
-        }
-        return false;
-    }
-
-    if (!(cart.wasm_data[0] == 0x00 && cart.wasm_data[1] == 0x61 &&
-          cart.wasm_data[2] == 0x73 && cart.wasm_data[3] == 0x6d)) {
+    if (!(image[header_size] == 0x00 && image[header_size + 1] == 0x61 &&
+          image[header_size + 2] == 0x73 && image[header_size + 3] == 0x6d)) {
         if (err && err_size) {
             snprintf(err, err_size, "bad wasm magic");
         }
+        heap_caps_free(image);
+        fclose(file);
         return false;
     }
 
+    out->data = image;
+    out->data_size = (uint32_t)image_size;
+    out->file_size = (uint32_t)file_size;
+    out->wasm_size = wasm_size;
+    out->stack_size = stack_size;
+    out->static_offset = (uint32_t)(header_size + wasm_size);
+    out->static_size = (uint32_t)(file_size - header_size - wasm_size);
+    out->file = file;
+
     return true;
+}
+
+void spark_cart_unload(SparkCartImage *cart)
+{
+    if (!cart) {
+        return;
+    }
+
+    if (cart->file) {
+        fclose(cart->file);
+        cart->file = NULL;
+    }
+
+    if (cart->data) {
+        heap_caps_free(cart->data);
+        cart->data = NULL;
+    }
+
+    memset(cart, 0, sizeof(*cart));
 }
