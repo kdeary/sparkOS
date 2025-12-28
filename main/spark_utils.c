@@ -75,9 +75,4 @@ void spark_log_memory_snapshot(const char *tag)
     esp_rom_printf("  largest internal: %u bytes\n", (unsigned)info_internal.largest_free_block);
     esp_rom_printf("  free spiram: %u bytes\n", (unsigned)info_spiram.total_free_bytes);
     esp_rom_printf("  largest spiram: %u bytes\n", (unsigned)info_spiram.largest_free_block);
-#if d_m3FixedHeap
-    esp_rom_printf("  wasm3 fixed heap: %u bytes\n", (unsigned)d_m3FixedHeap);
-#else
-    esp_rom_printf("  wasm3 fixed heap: disabled\n");
-#endif
 }
