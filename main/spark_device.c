@@ -85,9 +85,9 @@ bool spark_device_init_display(void)
 
     ESP_ERROR_CHECK(esp_lcd_panel_reset(s_panel));
     ESP_ERROR_CHECK(esp_lcd_panel_init(s_panel));
-    ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(s_panel, CONFIG_LCD_SWAP_XY));
-    ESP_ERROR_CHECK(esp_lcd_panel_mirror(s_panel, CONFIG_LCD_MIRROR_X, CONFIG_LCD_MIRROR_Y));
-    ESP_ERROR_CHECK(esp_lcd_panel_invert_color(s_panel, CONFIG_LCD_INVERT_COLORS));
+    ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(s_panel, 1));
+    ESP_ERROR_CHECK(esp_lcd_panel_mirror(s_panel, 0, 0));
+    ESP_ERROR_CHECK(esp_lcd_panel_invert_color(s_panel, 1));
     ESP_ERROR_CHECK(esp_lcd_panel_set_gap(s_panel, CONFIG_LCD_OFFSET_X, CONFIG_LCD_OFFSET_Y));
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(s_panel, true));
 

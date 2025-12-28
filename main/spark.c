@@ -7,6 +7,7 @@
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_rom_sys.h"
+#include "esp_timer.h"
 
 #include "engine/spark_engine.h"
 #include "main.h"
@@ -29,6 +30,8 @@ typedef struct SparkAppContext {
 } SparkAppContext;
 
 static SparkAppContext s_app;
+static uint32_t s_frame_skip;
+static uint32_t s_frames_skipped;
 
 static void *spark_wamr_psram_malloc(unsigned int size)
 {
@@ -301,6 +304,11 @@ static void *spark_app_thread(void *arg)
     spark_log_memory_snapshot("after runtime start");
     esp_rom_printf("[boot] running cart: %s\n", app->cart_path);
 
+    const int64_t frame_us = 16666;
+    int64_t next_frame = esp_timer_get_time();
+    s_frame_skip = 0;
+    s_frames_skipped = 0;
+
     while (1) {
         error = spark_engine_step(&app->runtime.engine, &app->runtime.wasm);
         if (error) {
@@ -309,18 +317,37 @@ static void *spark_app_thread(void *arg)
             break;
         }
 
-        for (int y = 0; y < SCREEN_HEIGHT; ++y) {
-            uint32_t row = (uint32_t)y * SCREEN_WIDTH;
-            for (int x = 0; x < SCREEN_WIDTH; ++x) {
-                uint8_t color_index = app->runtime.engine.framebuffer[row + x];
-                uint16_t color = app->runtime.engine.palette[color_index];
-                app->line_buffer[x] = spark_color_swap_bytes(color);
+        if (s_frames_skipped == 0) {
+            for (int y = 0; y < SCREEN_HEIGHT; ++y) {
+                uint32_t row = (uint32_t)y * SCREEN_WIDTH;
+                for (int x = 0; x < SCREEN_WIDTH; ++x) {
+                    uint8_t color_index = app->runtime.engine.framebuffer[row + x];
+                    uint16_t color = app->runtime.engine.palette[color_index];
+                    app->line_buffer[x] = spark_color_swap_bytes(color);
+                }
+                spark_device_draw_bitmap(0, y, SCREEN_WIDTH, y + 1, app->line_buffer);
             }
-            spark_device_draw_bitmap(0, y, SCREEN_WIDTH, y + 1, app->line_buffer);
+            s_frames_skipped = s_frame_skip;
+        } else {
+            s_frames_skipped--;
         }
 
         app->frame_counter++;
-        // esp_rom_delay_us(16000);
+
+        next_frame += frame_us;
+        {
+            int64_t now = esp_timer_get_time();
+            int64_t remaining = next_frame - now;
+
+            if (remaining > 0) {
+                esp_rom_delay_us((uint32_t)remaining);
+                if (s_frame_skip > 0) {
+                    s_frame_skip--;
+                }
+            } else {
+                if(s_frame_skip < 4) s_frame_skip++;
+            }
+        }
     }
 
     spark_runtime_deinit(&app->runtime);
