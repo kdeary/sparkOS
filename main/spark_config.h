@@ -1,0 +1,77 @@
+#pragma once
+
+#include "sdkconfig.h"
+
+/* ESP32 LCD defaults (override via sdkconfig if needed). */
+#ifndef CONFIG_LCD_WIDTH
+#define CONFIG_LCD_WIDTH 320
+#endif
+#ifndef CONFIG_LCD_HEIGHT
+#define CONFIG_LCD_HEIGHT 240
+#endif
+#ifndef CONFIG_LCD_OFFSET_X
+#define CONFIG_LCD_OFFSET_X 0
+#endif
+#ifndef CONFIG_LCD_OFFSET_Y
+#define CONFIG_LCD_OFFSET_Y 0
+#endif
+#ifndef CONFIG_LCD_SCLK_GPIO
+#define CONFIG_LCD_SCLK_GPIO 12
+#endif
+#ifndef CONFIG_LCD_DC_GPIO
+#define CONFIG_LCD_DC_GPIO 46
+#endif
+#ifndef CONFIG_LCD_CS_GPIO
+#define CONFIG_LCD_CS_GPIO 10
+#endif
+#ifndef CONFIG_LCD_MISO_GPIO
+#define CONFIG_LCD_MISO_GPIO 13
+#endif
+#ifndef CONFIG_LCD_MOSI_GPIO
+#define CONFIG_LCD_MOSI_GPIO 11
+#endif
+#ifndef CONFIG_LCD_BL_GPIO
+#define CONFIG_LCD_BL_GPIO 45
+#endif
+#ifndef CONFIG_LCD_RST_GPIO
+#define CONFIG_LCD_RST_GPIO -1
+#endif
+#ifndef CONFIG_LCD_PIXEL_CLOCK
+#define CONFIG_LCD_PIXEL_CLOCK (40 * 1000 * 1000)
+#endif
+#ifndef CONFIG_LCD_BL_ACTIVE_HIGH
+#define CONFIG_LCD_BL_ACTIVE_HIGH 1
+#endif
+#ifndef CONFIG_LCD_SWAP_XY
+#define CONFIG_LCD_SWAP_XY 1
+#endif
+#ifndef CONFIG_LCD_MIRROR_X
+#define CONFIG_LCD_MIRROR_X 0
+#endif
+#ifndef CONFIG_LCD_MIRROR_Y
+#define CONFIG_LCD_MIRROR_Y 0
+#endif
+#ifndef CONFIG_LCD_INVERT_COLORS
+#define CONFIG_LCD_INVERT_COLORS 0
+#endif
+#ifndef CONFIG_LCD_COLOR_SPACE_BGR
+#define CONFIG_LCD_COLOR_SPACE_BGR 1
+#endif
+#ifndef CONFIG_SDMMC_CLK_GPIO
+#define CONFIG_SDMMC_CLK_GPIO 38
+#endif
+#ifndef CONFIG_SDMMC_CMD_GPIO
+#define CONFIG_SDMMC_CMD_GPIO 40
+#endif
+#ifndef CONFIG_SDMMC_D0_GPIO
+#define CONFIG_SDMMC_D0_GPIO 39
+#endif
+#ifndef CONFIG_SDMMC_D1_GPIO
+#define CONFIG_SDMMC_D1_GPIO 41
+#endif
+#ifndef CONFIG_SDMMC_D2_GPIO
+#define CONFIG_SDMMC_D2_GPIO 48
+#endif
+#ifndef CONFIG_SDMMC_D3_GPIO
+#define CONFIG_SDMMC_D3_GPIO 47
+#endif
